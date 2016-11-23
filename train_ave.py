@@ -11,7 +11,7 @@ import keras.backend as K
 import pandas as pd
 import argparse
 
-from model_builder import build_autoencoder, build_ave
+from model_builder import build_autoencoder, build_ave, save_model, load_model
 from keras.datasets import mnist
 
 class Empty(object):
@@ -59,13 +59,47 @@ def predict_model(sess, model, x):
     pred_vals = sess.run(model.output, feed_dict=feed_dict)   
     return pred_vals
 
+def generate_images(train_data, valid_data, p):
+    (train_x, train_y), (valid_x, valid_y) = train_data, test_data
+    in_shape = (None, train_x.shape[1])
+    model, encoder_model, generator_model = build_ave(in_shape, p.l2reg,p.n_latent)
+
+    learning_rate = tf.placeholder(tf.float32, shape=[])
+
+    tfepoch = tf.Variable(0)
+    saver = tf.train.Saver()
+
+    init = tf.initialize_all_variables()
+    sess = tf.Session()
+    sess.run(init)
+
+    load_model(sess, saver, modelfn=p.modelfn)
+    
+    # trained MNIST latent is ranged at (-0.15, 0.15)
+    current_var = np.ones(12) * (-0.15)
+    step = 0.015
+    idx = 0
+    for latent_id in range(0,p.n_latent,2):
+        latent_ids = [latent_id, latent_id+1]
+        for seed in np.arange(-0.15,0.15,step):
+            current_var[latent_ids] = [seed,seed]
+            latent_vars = np.expand_dims(current_var + np.random.normal(0,0.01,12),0)
+            #latent_vars = np.expand_dims(np.ones(12)*i + np.random.normal(0,0.001,12),0)
+            #latent_vars = np.expand_dims(np.random.normal(0,0.15,12),0)
+            digit = predict_model(sess, generator_model, latent_vars)[0].reshape(28,28)
+            plt.imshow(255-digit,cmap='Greys_r')
+            plt.savefig('figures/digits/img_%d.png'%idx, dpi=100)
+            idx += 1
+        
+    sess.close()
+    print '%d images have been generated'%(idx + 1)
 
 def train_model(train_data, valid_data, p):
     (train_x, train_y), (valid_x, valid_y) = train_data, test_data
     lr = p.init_lr
 
     in_shape = (None, train_x.shape[1])
-    model, encoder_model, generator_model = build_ave(in_shape, p.l2reg)
+    model, encoder_model, generator_model = build_ave(in_shape, p.l2reg,p.n_latent)
 
     learning_rate = tf.placeholder(tf.float32, shape=[])
     train_step = tf.train.AdamOptimizer(learning_rate).minimize(model.loss)
@@ -111,7 +145,7 @@ def train_model(train_data, valid_data, p):
     epochassign = tfepoch.assign(epoch)
     sess.run(epochassign)
     if not p.modelfn is None:
-        save_model(sess, saver,modelfn)
+        save_model(sess, saver,p.modelfn)
     
     # generate decoded images to show
     encoded_imgs = predict_model(sess, encoder_model, valid_x)
@@ -154,7 +188,8 @@ if __name__ == '__main__':
     parser.add_argument('--power', type=float, default=0.25, help='L2 reg lambda')
     parser.add_argument('--num_epochs', type=int, default=50, help='number of epochs')
     parser.add_argument('--batch_size', type=int, default=100, help='batch size')
-
+    parser.add_argument('--n_latent', type=int, default=2, help='dim of latent space')
+    
     args = parser.parse_args()
 
     #USING RESMAN
@@ -170,7 +205,12 @@ if __name__ == '__main__':
     params.modelfn = args.modelfn
     params.gamma = args.gamma
     params.power = args.power
+    params.n_latent = args.n_latent
 
     train_data, test_data = load_data()
-    
-    train_model(train_data, test_data,params)
+    if args.forward:
+        generate_images(train_data, test_data, params)
+    else:
+        train_model(train_data, test_data,params)
+
+

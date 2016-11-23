@@ -8,6 +8,10 @@ http://blog.fastforwardlabs.com/post/148842796218/introducing-variational-autoen
 http://blog.fastforwardlabs.com/post/149329060653/under-the-hood-of-the-variational-autoencoder-in
 https://github.com/fastforwardlabs/vae-tf
 https://arxiv.org/pdf/1312.6114v10.pdf
+
+From NN and Bayes views to see VAE
+https://jaan.io/unreasonable-confusion/
+
 '''
 
 
@@ -24,6 +28,18 @@ from keras.regularizers import l2
 from keras import regularizers
 import keras.backend as K
 from IPython import embed
+
+def load_model(sess, saver, modelfn='save.ckpt'):
+    if not os.path.isfile(modelfn):
+        print '--- %s not found. Restart a new training process.' % modelfn
+        return False
+    saver.restore(sess, modelfn)
+    print '---------------model restored'
+    return True
+
+def save_model(sess, saver, modelfn='save.ckpt'):
+    save_path = saver.save(sess, modelfn)
+    print 'Model saved in file: ', save_path
 
 def make_loss_construction(model, in_x):
     model.construction_loss = tf.reduce_mean(K.binary_crossentropy(model.output, in_x))
@@ -74,10 +90,10 @@ def make_ave_loss(model,z_mean, z_log_var):
     model.loss = tf.reduce_mean(K.mean(construction_loss,axis=-1) + KL_loss)
     return model
 
-def build_ave(input_shape, l2reg = 0.):
-    latent_dim = 2
+def build_ave(input_shape, l2reg = 0., n_latent=2):
+    latent_dim = n_latent
     intermediate_dim = 500
-    intermediate_dim2 = 500
+    intermediate_dim2 = 501
 
     (N, C) = input_shape
 
@@ -100,8 +116,8 @@ def build_ave(input_shape, l2reg = 0.):
     z = Lambda(gaussian_sampling, output_shape=(latent_dim,))([z_mean,z_log_var])
 
     # Decoding
-    decoder_h = Dense(intermediate_dim, activation='relu',W_regularizer=l2(l2reg))
-    decoder_h2 = Dense(intermediate_dim2, activation='relu',W_regularizer=l2(l2reg))
+    decoder_h = Dense(intermediate_dim2, activation='relu',W_regularizer=l2(l2reg))
+    decoder_h2 = Dense(intermediate_dim, activation='relu',W_regularizer=l2(l2reg))
     decoder_mean = Dense(C, activation='sigmoid',W_regularizer=l2(l2reg))
     h_decoded = decoder_h(z)
     h_decoded = decoder_h2(h_decoded)
