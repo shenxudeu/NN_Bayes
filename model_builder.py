@@ -90,10 +90,10 @@ def make_ave_loss(model,z_mean, z_log_var):
     model.loss = tf.reduce_mean(K.mean(construction_loss,axis=-1) + KL_loss)
     return model
 
-def build_ave(input_shape, l2reg = 0., n_latent=2):
+def build_ave(input_shape, l2reg = 0., n_latent=2,n_dim=500, n_dim2=501):
     latent_dim = n_latent
-    intermediate_dim = 500
-    intermediate_dim2 = 501
+    intermediate_dim = n_dim
+    intermediate_dim2 = n_dim2
 
     (N, C) = input_shape
 
@@ -110,7 +110,8 @@ def build_ave(input_shape, l2reg = 0., n_latent=2):
     def gaussian_sampling(args):
         '''(Differentiably!) draw samle from Gaussian with mu and log variance'''
         z_mean, z_log_var = args
-        epsilon = K.random_normal(shape=tf.shape(z_mean), mean=0., std=0.01)
+        #epsilon = K.random_normal(shape=tf.shape(z_mean), mean=0., std=0.01)
+        epsilon = K.random_normal(shape=tf.shape(z_mean), mean=0., std=0.002)
         return z_mean + K.exp(z_log_var / 2) * epsilon
     
     z = Lambda(gaussian_sampling, output_shape=(latent_dim,))([z_mean,z_log_var])
